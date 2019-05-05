@@ -3,12 +3,16 @@ title: "Puzzle Times!"
 output: 
   flexdashboard::flex_dashboard:
     orientation: rows
+    navbar:
+      - { icon: "fa-home", href: "https://mdeininger.github.io", align: right }
 ---
 
 ```{r}
 require(plotly); require(lubridate); require(dplyr); require(flexdashboard); require(data.table)
-puzzle_times <- readRDS("times_data/puzzle_times_4_21_2019.RDS")
-color_map <- tibble(who = c("Claire Day", "Steve Day", "Matthew Deininger", "David Deininger"), m_color = c("red", "blue", "orange", "purple"))
+puzzle_times <- readRDS("times_data/puzzle_times_4_21_2019.RDS") %>% setDT()
+puzzle_times[, who := stringr::str_extract(who, "^\\w*")]
+puzzle_times[, author := stringr::str_extract(author, "^\\w*")]
+color_map <- tibble(who = c("Claire", "Steve", "Matthew", "David"), m_color = c("red", "blue", "orange", "purple"))
 
 puzzle_times <- merge(puzzle_times, color_map, all = T, by = c("who"))
 

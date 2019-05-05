@@ -1,11 +1,11 @@
 name: "personal-website"
 output_dir: "."
 navbar:
-  title: "Personal Website"
+  title: "Matthew's Website"
   left:
     - text: "Home"
       href: index.html
     - text: "About Me"
       href: about.html
     - text: "Puzzle Times"
-      href:  ./times_times/puzzle_dashboard.html
+      href:  times_times/puzzle_dashboard.html

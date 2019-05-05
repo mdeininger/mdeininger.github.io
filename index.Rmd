@@ -1,5 +1,8 @@
 ---
-title: "My Site's Title"
+title: "Website for Hosting Projects"
 ---
 
-Welcome to my site!
+This website is an exploration of the possible with Rmarkdown and Plotly.
+
+Currently, the only project on here is "Puzzle Times", but I hope to add more as I work on them.
+
