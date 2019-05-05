@@ -1,0 +1,286 @@
+---
+title: "Puzzle Times!"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: rows
+---
+
+```{r}
+require(plotly); require(lubridate); require(dplyr); require(flexdashboard); require(data.table)
+puzzle_times <- readRDS("times_data/puzzle_times_4_21_2019.RDS")
+color_map <- tibble(who = c("Claire Day", "Steve Day", "Matthew Deininger", "David Deininger"), m_color = c("red", "blue", "orange", "purple"))
+
+puzzle_times <- merge(puzzle_times, color_map, all = T, by = c("who"))
+
+puzzle_times_last_month <- puzzle_times %>% mutate(days_from_max = date - max(date)) %>%
+  filter(days_from_max > -30) %>% setDT()
+```
+
+Overview {data-icon="fa-th-large"}
+=====================================
+
+Row
+-------------------------------------
+### Fastest Time, this Month!
+
+```{r}
+fastest_time <- puzzle_times_last_month[puzzle_time_num == min(puzzle_times_last_month$puzzle_time_num)]
+valueBox(fastest_time$puzzle_time_num[[1]], icon = "fa-trophy", caption = paste0("Fastest Time this Month:<br>", fastest_time$author[[1]], " | ", fastest_time$date[[1]]), color = "green")
+```
+
+### Median of this Month
+
+```{r}
+avg_time <- round(median(puzzle_times_last_month$puzzle_time_num),2)
+valueBox(avg_time, icon = "fa-hourglass-start")
+```
+
+### Mean of this Month
+
+```{r}
+avg_time <- round(mean(puzzle_times_last_month$puzzle_time_num),2)
+valueBox(avg_time, icon = "fa-hourglass-end")
+```
+
+### Slowest Time this Month
+
+```{r}
+slowest_time <- puzzle_times_last_month[puzzle_time_num == max(puzzle_times_last_month$puzzle_time_num)]
+valueBox(slowest_time$puzzle_time_num[[1]], icon = "fa-frown-o", caption = paste0("Slowest Time this Month:<br>", slowest_time$author[[1]], " | ", slowest_time$date[[1]]), color = "red")
+```
+
+Row
+-------------------------------------
+
+### Distribution of all Times
+```{r}
+puzzle_times[who == author,] %>%
+  plot_ly() %>%
+  add_histogram(x = ~puzzle_time_num, marker = list(color = RColorBrewer::brewer.pal(1, name = "Accent")[[2]])) %>%
+  layout(xaxis = list(title = "Puzzle Time (seconds)"), yaxis = list(title = "Counts"))
+```
+
+
+### Average Times by Day of the Week
+```{r}
+puzzle_times[who == author,] %>%
+  group_by(day_of_week) %>%
+  summarise(mean_time = mean(puzzle_time_num), median_time = median(puzzle_time_num)) %>% 
+  mutate(day_of_week = factor(day_of_week, c("Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"))) %>%
+  plot_ly() %>%
+  add_bars(x = ~day_of_week, y = ~median_time, color = ~day_of_week, name = "Median") %>%
+  add_markers(x = ~day_of_week, y = ~mean_time, color = ~day_of_week, name = "Mean", marker = list(size = 12)) %>%
+  hide_legend() %>%
+  layout(xaxis = list(title = ''), yaxis = list(title = "Mean Time in Seconds"))
+```
+
+
+Row 
+-------------------------------------
+### Fastest Time Ever!
+
+```{r}
+fastest_time <- puzzle_times[puzzle_time_num == min(puzzle_times$puzzle_time_num)]
+valueBox(fastest_time$puzzle_time_num[[1]], icon = "fa-trophy", caption = paste0("Fastest Time Ever:<br>", fastest_time$author[[1]], " | ", fastest_time$date[[1]]), color = "green")
+```
+
+### Median of all Times
+
+```{r}
+avg_time <- round(median(puzzle_times$puzzle_time_num),2)
+valueBox(avg_time, icon = "fa-hourglass-start")
+```
+
+### Mean of all Times
+
+```{r}
+avg_time <- round(mean(puzzle_times$puzzle_time_num),2)
+valueBox(avg_time, icon = "fa-hourglass-end")
+```
+
+### Slowest Time Ever
+
+```{r}
+slowest_time <- puzzle_times[puzzle_time_num == max(puzzle_times$puzzle_time_num)]
+valueBox(slowest_time$puzzle_time_num[[1]], icon = "fa-frown-o", caption = paste0("Slowest Time Ever:<br>", slowest_time$author[[1]], " | ", slowest_time$date[[1]]), color = "red")
+```
+
+
+Comparing Times {data-icon="fa-clock"}
+=====================================  
+
+Row {.tabset .tabset-fade}
+-------------------------------------
+    
+### All the Data!
+    
+```{r}
+p1 <- puzzle_times[who == author,] %>%
+  plot_ly() %>%
+  add_markers(x = ~date, y = ~puzzle_time_num, color = ~who, colors = ~m_color, alpha = 0.8, legendgroup = ~who) %>%
+  layout(xaxis = list(title = "Across Time"), yaxis = list(title = "Puzzle Time (seconds)"))
+
+p2 <- puzzle_times[who == author,] %>%
+  group_by(who) %>%
+  mutate(average_time = zoo::rollapply(puzzle_time_num, 30, function(x){median(x, na.rm = T)}, fill = NA, align = "right"))  %>%
+  plot_ly() %>%
+    add_lines(x = ~date, y = ~average_time, color = ~who, colors =~ m_color, legendgroup = ~who, showlegend = F) %>%
+      layout( xaxis = list(title = ""), yaxis = list(title = "Rolling Average of Puzzle Time (seconds)"))
+
+p3 <- puzzle_times[who == author,] %>%
+  mutate(puzzle_time_num = ifelse(puzzle_time_num > 4*60, 4*60, puzzle_time_num)) %>%
+  group_by(who) %>%
+  do(p = plot_ly(.) %>%
+    add_histogram(x = ~puzzle_time_num, name = ~who, xbins = list(start = 0, size = 10), alpha = 0.8, legendgroup = ~who, showlegend = F, marker = list(color = ~m_color)) %>%
+      add_segments(x = ~mean(puzzle_time_num), xend= ~mean(puzzle_time_num), y = 0, yend = ~max(table(ceiling(puzzle_time_num/10)))  + 5, legendgroup = ~who,  showlegend = FALSE, name = "Mean", line=list(color="darkred"),  alpha = 0.8) %>%
+      add_segments(x = ~median(puzzle_time_num), xend= ~median(puzzle_time_num), y = 0, yend = ~max(table(ceiling(puzzle_time_num/10)))  + 5, legendgroup = ~who,  showlegend = FALSE, name = "Median", line=list(color="black"),  alpha = 0.8) %>%
+      layout( xaxis = list(title = "Puzzle Time (seconds)"), yaxis= list(title = ~paste0(who)))
+  ) %>%
+  subplot(nrows = 4, shareX = T, titleY = T)
+
+p4 <- 
+puzzle_times[who == author,] %>%
+  group_by(date) %>%
+  mutate(rank_order = rank(puzzle_time_num, ties.method = "min")) %>%
+  filter(rank_order <= 4) %>%
+  group_by(who) %>%
+  count(rank_order) %>%
+  mutate(total_n = sum(n)) %>%
+  mutate(pct_n = 100*n/total_n) %>%
+  merge(color_map, all = T, by = "who") %>%
+  group_by(who) %>%
+  do(p = plot_ly(.) %>%
+    add_bars(x = ~rank_order, y = ~pct_n, name = ~who,  legendgroup = ~who,  showlegend = FALSE, marker = list(color = ~m_color)) %>%
+      layout( xaxis = list(title = "Rank on Puzzles",  tick0 = 1, dtick = 1), yaxis = list(range = c(0,50), ticksuffix = "%", title = "") )
+  ) %>%
+  subplot(nrows = 4, shareX = T, titleY = T)
+
+subplot( subplot(p1, p2, titleY = T, shareX = T, nrows = 2, margin = 0.035), subplot(p3, p4, nrows = 2, titleY = T, titleX = T, margin = 0.035), nrows = 1, titleY = T, titleX = T, margin = 0.035)
+```
+
+### Non-Saturdays
+    
+```{r}
+p1 <- puzzle_times[who == author & day_of_week != "Saturday",] %>%
+  plot_ly() %>%
+  add_markers(x = ~date, y = ~puzzle_time_num, color = ~who, colors = ~m_color, alpha = 0.8, legendgroup = ~who) %>%
+  layout(xaxis = list(title = "Across Time"), yaxis = list(title = "Puzzle Time (seconds)"))
+
+p2 <- puzzle_times[who == author & day_of_week != "Saturday",] %>%
+  group_by(who) %>%
+  mutate(average_time = zoo::rollapply(puzzle_time_num, 26, function(x){median(x, na.rm = T)}, fill = NA, align = "right"))  %>%
+  plot_ly() %>%
+    add_lines(x = ~date, y = ~average_time, color = ~who, colors = ~m_color, legendgroup = ~who, showlegend = F) %>%
+      layout( xaxis = list(title = ""), yaxis = list(title = "Rolling Average of Puzzle Time (seconds)"))
+
+p3 <- puzzle_times[who == author & day_of_week != "Saturday",] %>%
+   mutate(puzzle_time_num = ifelse(puzzle_time_num > 4*60, 4*60, puzzle_time_num)) %>%
+  group_by(who) %>%
+  do(p = plot_ly(.) %>%
+    add_histogram(x = ~puzzle_time_num, name = ~who, xbins = list(start = 0, size = 10), alpha = 0.8, legendgroup = ~who, showlegend = F, marker = list(color = ~m_color)) %>%
+      add_segments(x = ~mean(puzzle_time_num), xend= ~mean(puzzle_time_num), y = 0, yend = ~max(table(ceiling(puzzle_time_num/10)))  + 5, legendgroup = ~who,  showlegend = FALSE, name = "Mean", line=list(color="darkred"),  alpha = 0.8) %>%
+      add_segments(x = ~median(puzzle_time_num), xend= ~median(puzzle_time_num), y = 0, yend = ~max(table(ceiling(puzzle_time_num/10)))  + 5, legendgroup = ~who,  showlegend = FALSE, name = "Median", line=list(color="black"),  alpha = 0.8) %>%
+      layout( xaxis = list(title = "Puzzle Time (seconds)"), yaxis= list(title = ~paste0(who)))
+  ) %>%
+  subplot(nrows = 4, shareX = T, titleY = T)
+
+p4 <- 
+puzzle_times[who == author & day_of_week != "Saturday",] %>%
+  group_by(date) %>%
+  mutate(rank_order = rank(puzzle_time_num, ties.method = "min")) %>%
+  filter(rank_order <= 4) %>%
+  group_by(who) %>%
+  count(rank_order) %>%
+  mutate(total_n = sum(n)) %>%
+  mutate(pct_n = 100*n/total_n) %>%
+  merge(color_map, all = T, by = "who") %>%
+  group_by(who) %>%
+  do(p = plot_ly(.) %>%
+    add_bars(x = ~rank_order, y = ~pct_n, name = ~who,  legendgroup = ~who,  showlegend = FALSE, marker = list(color = ~m_color)) %>%
+      layout( xaxis = list(title = "Rank on Puzzles",  tick0 = 1, dtick = 1), yaxis = list(range = c(0,50), ticksuffix = "%", title = "") )
+  ) %>%
+  subplot(nrows = 4, shareX = T, titleY = T)
+
+subplot( subplot(p1, p2, titleY = T, shareX = T, nrows = 2 ), subplot(p3, p4, nrows = 2, titleY = T, titleX = T), nrows = 1, titleY = T, titleX = T)
+```
+
+### Saturdays
+    
+```{r}
+p1 <- puzzle_times[who == author & day_of_week == "Saturday",] %>%
+  plot_ly() %>%
+  add_markers(x = ~date, y = ~puzzle_time_num, color = ~who, colors = ~m_color, alpha = 0.8, legendgroup = ~who) %>%
+  layout(xaxis = list(title = "Across Time"), yaxis = list(title = "Puzzle Time (seconds)"))
+
+p2 <- puzzle_times[who == author & day_of_week == "Saturday",] %>%
+  group_by(who) %>%
+  mutate(average_time = zoo::rollapply(puzzle_time_num, 4, function(x){median(x, na.rm = T)}, fill = NA, align = "right"))  %>%
+  plot_ly() %>%
+    add_lines(x = ~date, y = ~average_time, color = ~who, colors = ~m_color, legendgroup = ~who, showlegend = F) %>%
+      layout( xaxis = list(title = "Puzzle Time (seconds)"), yaxis = list(title = "Rolling Average of Puzzle Time (seconds)"))
+
+p3 <- puzzle_times[who == author & day_of_week == "Saturday",] %>%
+   mutate(puzzle_time_num = ifelse(puzzle_time_num > 4*60, 4*60, puzzle_time_num)) %>%
+  group_by(who) %>%
+  do(p = plot_ly(.) %>%
+    add_histogram(x = ~puzzle_time_num, name = ~who, xbins = list(start = 0, size = 10), alpha = 0.8, legendgroup = ~who, showlegend = F, marker = list(color = ~m_color)) %>%
+      add_segments(x = ~mean(puzzle_time_num), xend= ~mean(puzzle_time_num), y = 0, yend = ~max(table(ceiling(puzzle_time_num/10)))  + 5, legendgroup = ~who,  showlegend = FALSE, name = "Mean", line=list(color="darkred"),  alpha = 0.8) %>%
+      add_segments(x = ~median(puzzle_time_num), xend= ~median(puzzle_time_num), y = 0, yend = ~max(table(ceiling(puzzle_time_num/10)))  + 5, legendgroup = ~who,  showlegend = FALSE, name = "Median", line=list(color="black"),  alpha = 0.8) %>%
+      layout( xaxis = list(title = "Puzzle Time (seconds)"), yaxis= list(title = ~paste0(who)))
+  ) %>%
+  subplot(nrows = 4, shareX = T, titleY = T)
+
+p4 <- 
+puzzle_times[who == author & day_of_week == "Saturday",] %>%
+  group_by(date) %>%
+  mutate(rank_order = rank(puzzle_time_num, ties.method = "min")) %>%
+  filter(rank_order <= 4) %>%
+  group_by(who) %>%
+  count(rank_order) %>%
+  mutate(total_n = sum(n)) %>%
+  mutate(pct_n = 100*n/total_n) %>%
+  merge(color_map, all = T, by = "who") %>%
+  group_by(who) %>%
+  do(p = plot_ly(.) %>%
+    add_bars(x = ~rank_order, y = ~pct_n, name = ~who,  legendgroup = ~who,  showlegend = FALSE, marker = list(color = ~m_color)) %>%
+      layout( xaxis = list(title = "Rank on Puzzles",  tick0 = 1, dtick = 1), yaxis = list(range = c(0,50), ticksuffix = "%", title = "") )
+  ) %>%
+  subplot(nrows = 4, shareX = T, titleY = T)
+
+subplot( subplot(p1, p2, titleY = T, shareX = T, nrows = 2 ), subplot(p3, p4, nrows = 2, titleY = T, titleX = T), nrows = 1, titleY = T, titleX = T)
+```
+
+
+Description {data-icon="fa-envelope"}
+=====================================
+
+Hello!
+
+ 
+Claire and I have been wanting to look at our puzzle times for a while now; we have been texting them to each other for over a year! She spent some time last November typing up a few months of results, but that quickly turned out to be unsustainable.
+
+    
+I have been working on text-mining projects at work lately, and so I figured that I would take a crack at reading in our text messages. It turns out it is pretty simple to save an iMessage chat as a pdf, and  from there getting it into R is quite easy. Most messages come with a tag of who sent them, and I can infer the rest. Each day the first message always gets a date-time stamp that I use to figure out the date of the puzzles.
+
+
+I try to remove some puzzle times that are in texts with the words "Eli" or "Deborah" or "Chris", as not to erroneusly assign them. One fault of this is that we lose times where we say, "1:44! Eli kept poking me!", but alas, what can one do.
+
+
+I also remove times that are not on a Saturday and are above 5 minutes. I checked a few of these and they were all large crossword puzzle times we had sent to the group. I'm confident many other errors slipped through my grasp.
+
+ 
+The charts took me a bit to make, and I think that they all came out well. I particuraly enjoy knowing that Wednesday is our best day and Monday and Friday our worst (ommiting the twice-as-difficult Saturday puzzle). Claire holds a pretty strong lead over the rest of us, I must say, getting 1st place nearly 50% of the times she enters a Times time. I can see that I personally have the most room left for improvement which is quite the encouragement.
+
+ 
+Currently, updates for this should be as simple as me logging onto my laptop, saving a pdf, and rerunning a short script. I'm hoping to spend time exploring the possibility of having a script automatically do that, so our leaderboards and charts and averages could update every night, but that may be beyond my powers. Also, while this is currently just an html file, I may look into finding it a home on the internet.
+
+
+May the best time puzzle,
+
+  
+Matthew
+
+ 
+P.S.  If you have any requests for specific data-crunches, let me know.
+
+

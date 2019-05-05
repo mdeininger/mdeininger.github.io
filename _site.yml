@@ -8,4 +8,4 @@ navbar:
     - text: "About Me"
       href: about.html
     - text: "Puzzle Times"
-    href:  puzzle_dashboard.html
+      href:  puzzle_dashboard.html
