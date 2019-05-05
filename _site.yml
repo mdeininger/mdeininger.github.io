@@ -7,3 +7,5 @@ navbar:
       href: index.html
     - text: "About Me"
       href: about.html
+    - text: "Puzzle Times"
+      href:  puzzle_times.html
