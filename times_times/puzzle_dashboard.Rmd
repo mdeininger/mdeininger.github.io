@@ -9,7 +9,7 @@ output:
 
 ```{r}
 require(plotly); require(lubridate); require(dplyr); require(flexdashboard); require(data.table)
-puzzle_times <- readRDS("times_data/puzzle_times_4_21_2019.RDS") %>% setDT()
+puzzle_times <- readRDS("times_data/puzzle_times_5_5_2019.RDS") %>% setDT()
 puzzle_times[, who := stringr::str_extract(who, "^\\w*")]
 puzzle_times[, author := stringr::str_extract(author, "^\\w*")]
 color_map <- tibble(who = c("Claire", "Steve", "Matthew", "David"), m_color = c("red", "blue", "orange", "purple"))
@@ -121,7 +121,7 @@ Row {.tabset .tabset-fade}
 ```{r}
 p1 <- puzzle_times[who == author,] %>%
   plot_ly() %>%
-  add_markers(x = ~date, y = ~puzzle_time_num, color = ~who, colors = ~m_color, alpha = 0.8, legendgroup = ~who) %>%
+  add_markers(x = ~date, y = ~puzzle_time_num, color = ~who, colors = ~m_color, alpha = 0.8, legendgroup = ~who, text = ~text_no_time) %>%
   layout(xaxis = list(title = "Across Time"), yaxis = list(title = "Puzzle Time (seconds)"))
 
 p2 <- puzzle_times[who == author,] %>%
@@ -254,6 +254,50 @@ puzzle_times[who == author & day_of_week == "Saturday",] %>%
 subplot( subplot(p1, p2, titleY = T, shareX = T, nrows = 2 ), subplot(p3, p4, nrows = 2, titleY = T, titleX = T), nrows = 1, titleY = T, titleX = T)
 ```
 
+Reporting Frequencies{data-icon="fa-chart-bar"}
+=====================================  
+
+Row 
+-------------------------------------
+    
+### How Often Everyone Reports
+```{r}
+puzzle_times_post_david <- puzzle_times[date >= min(puzzle_times[author == "David", date]) & who == author]
+all_days <- seq(min(puzzle_times_post_david$date), max(puzzle_times_post_david$date), by= "days")
+all_players <- c("Claire", "David", "Matthew", "Steve")
+
+full_data <- data.table(who = rep(all_players, times = length(all_days)),
+                        date = rep(all_days, each = length(all_players)))
+full_data <- merge(full_data, puzzle_times_post_david, all = T, by = c("who", "date"))
+full_data[, number_of_people_reporting := sum(!is.na(puzzle_time)), by = .(date)]
+full_data <- full_data[number_of_people_reporting >0,]
+
+
+how_many_people_generally_report <-   
+puzzle_times_post_david %>%
+  group_by(date) %>% count() %>%
+  group_by(n) %>% count() %>%
+  plot_ly() %>% add_bars(x = ~n, y = ~100*nn/sum(nn)) %>%
+  layout(xaxis = list(title = "Number of People Reporting",  tick0 = 1, dtick = 1), yaxis = list(ticksuffix = "%", title = "Percent of Days"))
+
+who_isnt_reporting <-
+full_data %>% group_by(who, number_of_people_reporting) %>% filter(is.na(puzzle_time)) %>%
+  count() %>% 
+  merge(color_map) %>%
+  plot_ly() %>%
+  add_bars(x = ~number_of_people_reporting, y = ~n, color = ~who, marker = list(color = ~m_color)) %>%
+  layout(xaxis = list(title = "Number of Other People Reporting",  tick0 = 1, dtick = 1), yaxis = list(title = "Times not Reporting"))
+
+how_many_people_generally_report
+```
+
+### Who is not Reporting?
+```{r}
+who_isnt_reporting
+```
+
+Row 
+-------------------------------------
 
 Description {data-icon="fa-envelope"}
 =====================================
